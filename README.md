@@ -1,5 +1,5 @@
 ## IBC-TLA+
-This is the public code of paper *Formal Analysis of IBC Protocol* of ICNP 2023. This document mainly introduces the overall framework of the code and explains and reports of the identified problems. At the beginning of our research, the latest commitment was [ref](https://github.com/cosmos/ibc/commit/f4d1578afa51e75f03aec8c0967129a38d424b91), and subsequent commitments were not considered.
+This is the public code of paper *Formal Analysis of IBC Protocol* of ICNP 2023. This document mainly introduces the overall framework of the code and explains and reports of the identified problems. At the beginning of our research, the latest commitment was [ref](https://github.com/cosmos/ibc/commit/35354566c37ad70c3606c15bc3c937f0e115ad66), and subsequent commitments were not considered.
 ### ICS03
 #### Chain
 ##### Description
