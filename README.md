@@ -1,5 +1,5 @@
 ## IBC-TLA+
-This is the public code of paper *Formal Analysis of IBC Protocol* of ICNP 2023. This document mainly introduces the overall framework of the code and explains and reports of the identified problems. At the beginning of our research, the latest commitment was [ref](https://github.com/cosmos/ibc/commit/35354566c37ad70c3606c15bc3c937f0e115ad66), and subsequent commitments were not considered.
+This document mainly introduces the overall framework of the code and explains and reports of the identified problems. At the beginning of our research, the latest commitment was [ref](https://github.com/cosmos/ibc/commit/35354566c37ad70c3606c15bc3c937f0e115ad66), and subsequent commitments were not considered.
 ### ICS03
 #### Chain
 ##### Description
@@ -227,6 +227,132 @@ HandlePacket(chainID) ==
     ELSE  
         /\ ChainB!HandlePacket(sourcePort, sourceChannel, destPort, destChannel, sequence, nextSeqRecv, proofChannel, proofSource, proofDest)
         /\ UNCHANGED chainAvars
+```
+### ICS20
+#### Chain
+##### Description
+See ICS20/Chain.tla.
+##### Data Structure
+```typescript
+"ChainStore":{
+    "connectionEnds":[{
+      "state":string,
+      "connectionID":int,
+      "clientID":int,
+      "counterpartyConnectionID":int,
+      "counterpartyClientID":int,
+      "versions":Set(int)
+    }],
+    "channelEnds":[{
+        "portID":int,
+        "channelID":int,
+        "state":string,
+        "order":string,
+        "counterpartyPortID":int,
+        "counterpartyChannelID":int,
+        "connectionID":int,
+        "version":int
+    }],
+    "nextSequenceSend":[int],
+    "nextSequenceRecv":[int],
+    "nextSequenceAck":[int],
+    "commitments":[Set({'portID':int,'channelID':int,'sequence':int,'data':struct})],
+    "receipts":[Set({'portID':int,'channelID':int,'sequence':int,'state':string})],
+    "acks":[Set({'portID':int,'channelID':int,'sequence':int,'state':string})]
+  }
+"FungibleTokenAccounts":[(string, Seq(Set(string))) -> int]
+```
+#### Environment
+##### Description
+See ICS20/Enviroment
+##### Key Function
+```TLA+
+Next == 
+    \/ \E chainID \in ChainIDs, 
+            sequence, nextSeqRecv \in Seqs,
+            channel \in ChannelIDs,
+            denomination \in {x[2] : x \in DOMAIN accountsA} \union {x[2]: x \in DOMAIN accountsB}, 
+            amount \in 1..MaxAmount:
+        LET 
+            port == getPortID(channel)
+            channelEnd == getChannelEnd(chainID, channel)
+            counterpartyChannel == channelEnd.counterpartyChannelID
+            counterpartyPort == channelEnd.counterpartyPortID
+            counterpartyChainID == getCounterpartyChainID(chainID)
+            ack == getPacketAck(counterpartyChainID, counterpartyPort, counterpartyChannel, sequence)
+            proof == proofPacketState(counterpartyChainID, counterpartyPort, counterpartyChannel, sequence)
+        IN 
+        IF chainID = "chainA"
+        THEN  
+            /\ ChainA!Actions(port, channel, counterpartyPort, counterpartyChannel, sequence, nextSeqRecv, ack, proof, denomination, amount)
+            /\ UNCHANGED chainVarsB
+        ELSE  
+            /\ ChainB!Actions(port, channel, counterpartyPort, counterpartyChannel, sequence, nextSeqRecv, ack, proof, denomination, amount)
+            /\ UNCHANGED chainVarsA
+    \/ UNCHANGED vars
+```
+### ICS721
+#### Chain
+##### Description
+See ICS721/Chain.tla.
+##### Data Structure
+```typescript
+"ChainStore":{
+    "connectionEnds":[{
+      "state":string,
+      "connectionID":int,
+      "clientID":int,
+      "counterpartyConnectionID":int,
+      "counterpartyClientID":int,
+      "versions":Set(int)
+    }],
+    "channelEnds":[{
+        "portID":int,
+        "channelID":int,
+        "state":string,
+        "order":string,
+        "counterpartyPortID":int,
+        "counterpartyChannelID":int,
+        "connectionID":int,
+        "version":int
+    }],
+    "nextSequenceSend":[int],
+    "nextSequenceRecv":[int],
+    "nextSequenceAck":[int],
+    "commitments":[Set({'portID':int,'channelID':int,'sequence':int,'data':struct})],
+    "receipts":[Set({'portID':int,'channelID':int,'sequence':int,'state':string})],
+    "acks":[Set({'portID':int,'channelID':int,'sequence':int,'state':string})]
+  }
+"NonFungibleTokenAccounts":[(Seq(Set(string)), int) -> string]
+```
+#### Environment
+##### Description
+See ICS721/Enviroment
+##### Key Function
+```TLA+
+Next == 
+    \/ \E chainID \in ChainIDs, 
+            sequence, nextSeqRecv \in Seqs,
+            channel \in ChannelIDs,
+            classId \in LimitClassIds,
+            tokenIds \in ((SUBSET TokenIds) \ {{}}):
+        LET 
+            port == getPortID(channel)
+            channelEnd == getChannelEnd(chainID, channel)
+            counterpartyChannel == channelEnd.counterpartyChannelID
+            counterpartyPort == channelEnd.counterpartyPortID
+            counterpartyChainID == getCounterpartyChainID(chainID)
+            ack == getPacketAck(counterpartyChainID, counterpartyPort, counterpartyChannel, sequence)
+            proof == proofPacketState(counterpartyChainID, counterpartyPort, counterpartyChannel, sequence)
+        IN 
+        IF chainID = "chainA"
+        THEN  
+            /\ ChainA!Actions(port, channel, counterpartyPort, counterpartyChannel, sequence, nextSeqRecv, ack, proof, classId, tokenIds)
+            /\ UNCHANGED chainVarsB
+        ELSE  
+            /\ ChainB!Actions(port, channel, counterpartyPort, counterpartyChannel, sequence, nextSeqRecv, ack, proof, classId, tokenIds)
+            /\ UNCHANGED chainVarsA
+    \/ UNCHANGED vars
 ```
 ### Results
 This section mainly discusses the reasons, triggering paths, repair suggestions of identified problems and community responses to our reports.
@@ -482,7 +608,8 @@ It does not match what the ```timeoutOnClose``` is designed for and
 
 There are different ways to solve this problem. We have reported this issue to the developers, who believe that although there is an issue at the protocol level, optimistic sending has been disabled in practical implementation ([ref](https://github.com/cosmos/ibc/issues/968#issuecomment-1552158823)). In fact, optimistic sending is disabled because similar issues have occurred in practical use ([ref](https://github.com/cosmos/ibc/issues/635#issuecomment-1020318753)). The root cause of these problems is that optimistic sending allows packets to be sent on channels that are not yet open, which may result in the channel being in a state of no counterparty, neither open nor closed, closed, or open. But the two functions ```timeoutOnClose``` and ```timeoutPacket``` fail to cover all situations.
 
-
+#### Abnormal Refund of Transferred Token
+See [report](https://github.com/cosmos/ibc/issues/1035).
 
 #### Code Redundancy
 

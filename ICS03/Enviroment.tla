@@ -59,7 +59,12 @@ getChainStore(chainID) ==
     IF chainID = "chainA"
     THEN chainAStore
     ELSE chainBStore
-        
+
+getCounterpartyClientID(clientID) ==
+    IF clientID = "clA"
+    THEN "clB"
+    ELSE "clA"
+
 getCounterpartyChainID(chainID) ==
     IF chainID = "chainA"
     THEN "chainB"
@@ -81,8 +86,9 @@ proofConnectionState(chainID, connectionID) ==
     ELSE [chainID |-> chainID, connection |-> nullConnectionEnd]
 
 HandleConnection(chainID) ==
-    \E clientID, counterpartyClientID \in ClientIDs, connectionID, counterpartyConnectionID \in ConnectionIDs, version \in (SUBSET Versions \ {{}}): 
+    \E clientID\in ClientIDs, connectionID, counterpartyConnectionID \in ConnectionIDs, version \in (SUBSET Versions \ {{}}): 
         LET 
+            counterpartyClientID == getCounterpartyClientID(clientID)
             counterpartyChainID == getCounterpartyChainID(chainID)
             proof == proofConnectionState(counterpartyChainID, counterpartyConnectionID) 
         IN
@@ -115,49 +121,24 @@ TypeOK ==
         LET chainStore == getChainStore(chainID) IN
         \A connectionID \in DOMAIN chainStore.connectionEnds : chainStore.connectionEnds[connectionID] \in ConnectionEnds
 
-
-SafaConnInit == \A chainID \in ChainIDs, connectionID \in ConnectionIDs: 
-                    LET connectionEnd == getConnectionEnd(chainID, connectionID) IN
-                    [](connectionEnd.state = "INIT" 
-                        => ~(<> (connectionEnd.state =  "UNINIT")))
-
-
-SafaConnTry == \A chainID \in ChainIDs, connectionID \in ConnectionIDs: 
-                    LET connectionEnd == getConnectionEnd(chainID, connectionID) IN
-                    [](connectionEnd.state = "TRYOPEN" 
-                        => ~(<> (connectionEnd.state =  "UNINIT" 
-                                \/ connectionEnd.state =  "INIT")))
-
-
-SafaConnOpen1 == \A chainID \in ChainIDs, connectionID \in ConnectionIDs: 
-                    LET connectionEnd == getConnectionEnd(chainID, connectionID) IN
-                    [](connectionEnd.state = "OPEN" 
-                        => ~(<> (connectionEnd.state =  "UNINIT" 
-                                \/ connectionEnd.state =  "INIT"
-                                \/ connectionEnd.state =  "TRYOPEN")))
-
-SafeConnInitandTry == [] [\A chainID \in ChainIDs, connectionID \in ConnectionIDs: 
+SafeHandShake1 == [] [\A chainID \in ChainIDs, connectionID \in ConnectionIDs: 
                     LET connection == getConnectionEnd(chainID, connectionID) IN
                     \/ connection'.state = connection.state
-                    \/ (connection'.state = "INIT" \/ connection'.state = "TRYOPEN") => (connection.state = "UNINIT" )]_vars
+                    \/ connection.state = "UNINIT" => (connection'.state = "INIT" \/ connection'.state = "TRYOPEN")]_vars
 
-
-SafeConnOpen2 == [] [\A chainID \in ChainIDs, connectionID \in ConnectionIDs: 
+SafeHandShake2 == [] [\A chainID \in ChainIDs, connectionID \in ConnectionIDs: 
                     LET connection == getConnectionEnd(chainID, connectionID) IN
                     \/ connection'.state = connection.state
-                    \/ connection'.state = "OPEN" => (connection.state = "INIT" \/ connection.state = "TRYOPEN")]_vars
+                    \/ (connection.state = "INIT" \/ connection.state = "TRYOPEN" \/ connection.state = "OPEN") => connection'.state = "OPEN"]_vars
 
 
-SafeHandShake == /\ SafaConnInit
-                 /\ SafaConnTry
-                 /\ SafeConnInitandTry
-                 /\ SafaConnOpen1
-                 /\ SafeConnOpen2
-
+SafeHandShake == 
+                 /\ SafeHandShake1
+                 /\ SafeHandShake2
 
 LiveConnOpen1 == \A chainID \in ChainIDs, connectionID \in ConnectionIDs: 
                     LET connectionEnd == getConnectionEnd(chainID, connectionID) IN
-                        <> (connectionEnd.state = "OPEN")
+                       [] (<> (connectionEnd.state = "OPEN"))
 
 
 LiveConnOpen2 == \A chainID \in ChainIDs, connectionID \in ConnectionIDs: 
@@ -170,11 +151,11 @@ LiveConnOpen3 == \A chainID \in ChainIDs, connectionID \in ConnectionIDs:
                     LET connectionEnd == getConnectionEnd(chainID, connectionID)
                         counterpartyConnectionEnd == 
                                 getConnectionEnd(getCounterpartyChainID(chainID), connectionEnd.counterpartyConnectionID) IN
-                                        []((connectionEnd.state = "TRYOPEN" /\ counterpartyConnectionEnd.state = "INIT" /\ counterpartyConnectionEnd.counterpartyConnectionID = connectionID) => <>(connectionEnd.state = "OPEN"))
+                                        []((connectionEnd.state = "TRYOPEN" /\ counterpartyConnectionEnd.state = "INIT" /\ <>(counterpartyConnectionEnd.counterpartyConnectionID = connectionID)) => <>(connectionEnd.state = "OPEN"))
 
-LiveHandShake == \*/\ LiveConnOpen1
+LiveHandShake == /\ LiveConnOpen1
                  \*/\ LiveConnOpen2
-                 /\ LiveConnOpen3
+                 \*/\ LiveConnOpen3
 
 
 CorrectOpen== \A chainID \in ChainIDs, connectionID \in ConnectionIDs: 
@@ -227,5 +208,5 @@ Pro ==
     /\ SafeHandShake
     /\ LiveHandShake
     /\ CorrectHandShake
-    /\ CorrectImpl
+
 =============================================================================

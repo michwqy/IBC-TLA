@@ -241,13 +241,6 @@ Next ==
         \/ \E chainID \in ChainIDs: 
             \/ HandleChannel(chainID)
             \/ HandlePacket(chainID)
-            (*
-            \/ 
-                \E seq \in Seqs:
-                /\ packetIsTimeOut' = [packetIsTimeOut EXCEPT ![chainID] = 
-                                                    [packetIsTimeOut[chainID] EXCEPT ![seq]=TRUE]]
-                /\ UNCHANGED <<chainAvars, chainBvars>>
-            *)
         \/ UNCHANGED vars
 
 Fairness == 
@@ -335,13 +328,15 @@ RecvXorTimeout ==
             [] ((close \in logs \/ timeout \in logs) => ~(recv \in counterpartyLogs \/ ack \in logs))
 
 OrderedChannel == 
-    \A i, j \in Seqs, chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
+    \A seq \in Seqs, chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
         LET 
+            logi == LogEntry(portID, channelID, seq, "recv")
+            logj == LogEntry(portID, channelID, seq-1, "recv")
+            packetLog == getPacketLog(chainID)
+            logs  == {packetLog[i] : i \in DOMAIN packetLog}
             channel == getChannelEnd(chainID, portID, channelID)
-            iLog == getLogEntry(chainID, portID, channelID, i)
-            jLog == getLogEntry(chainID, portID, channelID, j)
         IN 
-        [] ((channel.order /= "UNORDERED" /\ iLog.type = "recv" /\ jLog.type = "recv" /\ i < j) => (iLog.seq < jLog.seq))
+        [] ((channel.order /= "UNORDERED" /\ logi \in logs /\ seq >1) => (logj \in logs))
           
 Pro == 
     \*/\ RecvOrTimeout
