@@ -4,7 +4,7 @@ EXTENDS Integers, FiniteSets, Sequences
 
 CONSTANTS MaxChannelID, MaxPortID, MaxVersion, MaxConnectionID, chainID, counterpartyChainID
 
-VARIABLES chainStore
+VARIABLES chainStore, allowCloseChannel
 
 vars == <<chainStore>>
 
@@ -235,12 +235,18 @@ Init ==
     /\ chainStore = InitChainStore
 
 HandleChannel(order, connectionID, portID, channelID, counterpartyPortID, counterpartyChannelID, version, counterpartyVersion, proof) == 
+    /\
         \/ HandlechanOpenInit(order, connectionID, portID, counterpartyPortID, version)
         \/ HandlechanOpenTry(order, connectionID, portID, counterpartyPortID, counterpartyChannelID, version, counterpartyVersion, proof)  
         \/ HandlechanOpenAck(portID, channelID, counterpartyChannelID, counterpartyVersion, proof)
         \/ HandlechanOpenConfirm(portID, channelID, proof)
-        \/ HandlechanCloseInit(portID, channelID)
-        \/ HandlechanCloseConfirm(portID, channelID, proof)
+        \/  
+            /\ allowCloseChannel
+            /\ HandlechanCloseInit(portID, channelID)
+        \/  
+            /\ allowCloseChannel
+            /\ HandlechanCloseConfirm(portID, channelID, proof)
+    /\ UNCHANGED allowCloseChannel
 
 TypeOK == 
         /\ \A channelID \in DOMAIN chainStore.channelEnds : chainStore.channelEnds[channelID] \in ChannelEnds(Versions)

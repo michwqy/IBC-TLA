@@ -4,9 +4,9 @@ EXTENDS Integers, FiniteSets, Sequences
 
 CONSTANTS MaxChannelID, MaxPortID, MaxVersion, MaxConnectionID
 
-VARIABLES chainAStore, chainBStore
+VARIABLES chainAStore, chainBStore, AllowCloseChannel
 
-vars == <<chainAStore, chainBStore>>
+vars == <<chainAStore, chainBStore, AllowCloseChannel >>
 
 chainStores == <<chainAStore, chainBStore>>
 
@@ -64,12 +64,14 @@ ChainIDs == {"chainA", "chainB"}
 ChainA == INSTANCE Chain 
             WITH chainID <- "chainA",
                 counterpartyChainID <- "chainB",
-                chainStore <- chainAStore
+                chainStore <- chainAStore,
+                allowCloseChannel <- AllowCloseChannel
 
 ChainB == INSTANCE Chain 
             WITH chainID <- "chainB",
                 counterpartyChainID <- "chainA",
-                chainStore <- chainBStore
+                chainStore <- chainBStore,
+                allowCloseChannel <- AllowCloseChannel
                 
 getChainStore(chainID) == 
     IF chainID = "chainA"
@@ -114,6 +116,7 @@ HandleChannel(chainID) ==
 Init == 
     /\ ChainA!Init
     /\ ChainB!Init
+    /\ AllowCloseChannel \in BOOLEAN 
 
 Next == 
         \/ \E chainID \in ChainIDs: 
@@ -129,73 +132,46 @@ TypeOK ==
     /\ ChainA!TypeOK
     /\ ChainB!TypeOK
 
-SafaConnInit == \A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
-                    LET channelEnd == getChannelEnd(chainID, portID, channelID) IN
-                    [](channelEnd.state = "INIT" 
-                        => ~(<> (channelEnd.state =  "UNINIT")))
 
 
-SafaConnTry == \A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
-                    LET channelEnd == getChannelEnd(chainID, portID, channelID) IN
-                    [](channelEnd.state = "TRYOPEN" 
-                        => ~(<> (channelEnd.state =  "UNINIT" 
-                                \/ channelEnd.state =  "INIT")))
 
-
-SafaConnOpen1 == \A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
-                    LET channelEnd == getChannelEnd(chainID, portID, channelID) IN
-                    [](channelEnd.state = "OPEN" 
-                        => ~(<> (channelEnd.state =  "UNINIT" 
-                                \/ channelEnd.state =  "INIT"
-                                \/ channelEnd.state =  "TRYOPEN")))
-
-SafeConnOpen2 == [] [\A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
+SafeHandShake1 == [] [\A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
                     LET channelEnd == getChannelEnd(chainID, portID, channelID) IN
                     \/ channelEnd'.state = channelEnd.state
-                    \/ channelEnd'.state = "OPEN" => (channelEnd.state = "INIT" \/ channelEnd.state = "TRYOPEN")]_vars
+                    \/ channelEnd.state = "UNINIT" => (channelEnd'.state = "INIT" \/ channelEnd'.state = "TRYOPEN" )]_vars
 
-SafaConnClose1 == \A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
-                    LET channelEnd == getChannelEnd(chainID, portID, channelID) IN
-                    [](channelEnd.state = "CLOSED" 
-                        => ~(<> (channelEnd.state =  "UNINIT" 
-                                \/ channelEnd.state =  "INIT"
-                                \/ channelEnd.state =  "TRYOPEN"
-                                \/ channelEnd.state = "OPEN")))
-
-SafeConnClose2 == [] [\A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
+SafeHandShake2 == [] [\A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
                     LET channelEnd == getChannelEnd(chainID, portID, channelID) IN
                     \/ channelEnd'.state = channelEnd.state
-                    \/ channelEnd'.state = "CLOSED" => (channelEnd.state = "INIT" \/ channelEnd.state = "TRYOPEN" \/ channelEnd.state = "OPEN")]_vars
+                    \/ (channelEnd.state = "INIT" \/ channelEnd.state = "TRYOPEN" \/ channelEnd.state = "OPEN") => (channelEnd'.state = "CLOSED" \/ channelEnd'.state = "OPEN" )]_vars
 
-SafeHandShake == /\ SafaConnInit
-                 /\ SafaConnTry
-                 /\ SafaConnOpen1
-                 /\ SafeConnOpen2
-                 /\ SafaConnClose1
-                 /\ SafeConnClose2
-
-LiveConnInit == \A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
+SafeHandShake3 == [] [\A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
                     LET channelEnd == getChannelEnd(chainID, portID, channelID) IN
-                    <> (channelEnd.state = "INIT" \/ channelEnd.state = "TRYOPEN")
+                        channelEnd.state = "CLOSED" => channelEnd'.state = "CLOSED"]_vars
+
+SafeHandShake == 
+                 /\ SafeHandShake1
+                 /\ SafeHandShake2
+                 /\ SafeHandShake3
 
 LiveConnOpen1 == \A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
                     LET channelEnd == getChannelEnd(chainID, portID, channelID) IN
-                    <> (channelEnd.state = "OPEN")
+                    [] ((~AllowCloseChannel) => <> (channelEnd.state = "OPEN"))
 
 LiveConnOpen2 == \A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
                     LET channelEnd == getChannelEnd(chainID, portID, channelID)
                         counterpartyChainID == getCounterpartyChainID(chainID)
                         counterpartyChannelEnd == 
                                 getChannelEnd(counterpartyChainID, channelEnd.counterpartyPortID, channelEnd.counterpartyChannelID) IN
-                   <>(channelEnd.state = "TRYOPEN" /\ counterpartyChannelEnd.state = "INIT")
-                        => <>(channelEnd.state = "OPEN")
+                  [](((~AllowCloseChannel) /\ channelEnd.state = "TRYOPEN" /\ counterpartyChannelEnd.state = "INIT" /\ <>(counterpartyChannelEnd.counterpartyChannelID = channelID))
+                        => <>(channelEnd.state = "OPEN"))
 
 LiveConnClose == \A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
                     LET channelEnd == getChannelEnd(chainID, portID, channelID) IN
-                   <> [] (channelEnd.state = "CLOSED")
+                  [](AllowCloseChannel => <> (channelEnd.state = "CLOSED"))
 
-LiveHandShake == /\ LiveConnInit
-                 \*/\ LiveConnOpen1
+LiveHandShake == 
+                 /\ LiveConnOpen1
                  \*/\ LiveConnOpen2
                  /\ LiveConnClose
 
@@ -242,21 +218,6 @@ CorrectOrder2 == \A chainID \in ChainIDs, portID \in PortIDs, channelID \in Chan
                                 getChannelEnd(counterpartyChainID, channelEnd.counterpartyPortID, channelEnd.counterpartyChannelID) IN
                     <> (channelEnd.state = "OPEN") => <> (counterpartyChannelEnd.order = channelEnd.order) 
 
-(*
-CorrectClose1== \A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
-                    LET channelEnd == getChannelEnd(chainID, portID, channelID)
-                        counterpartyChainID == getCounterpartyChainID(chainID)
-                        counterpartyChannelEnd == 
-                                getChannelEnd(counterpartyChainID, channelEnd.counterpartyPortID, channelEnd.counterpartyChannelID) IN
-                    [] ((channelEnd.state = "CLOSED" /\ channelEnd.counterpartyChannelID /= nullChannelID) => <> (counterpartyChannelEnd.state = "CLOSED"))
-
-CorrectClose2== \A chainID \in ChainIDs, portID \in PortIDs, channelID \in ChannelIDs:
-                    LET channelEnd == getChannelEnd(chainID, portID, channelID)
-                        counterpartyChainID == getCounterpartyChainID(chainID)
-                        counterpartyChannelEnd == 
-                                getChannelEnd(counterpartyChainID, channelEnd.counterpartyPortID, channelEnd.counterpartyChannelID) IN
-                     <> ((channelEnd.state = "CLOSED" /\ channelEnd.counterpartyChannelID /= nullChannelID)) => <> (counterpartyChannelEnd.state = "CLOSED") 
-*)
 
 CorrectHandShake == /\ CorrectOpen1
                     /\ CorrectOpen2
@@ -264,6 +225,5 @@ CorrectHandShake == /\ CorrectOpen1
                     /\ CorrectVersion2
                     /\ CorrectOrder1
                     /\ CorrectOrder2
-                    \*/\ CorrectClose1
-                    \*/\ CorrectClose2    
+
 =============================================================================
