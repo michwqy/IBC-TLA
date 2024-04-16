@@ -1,10 +1,14 @@
-## IBC-TLA+
-This document mainly introduces the overall framework of the code and explains and reports of the identified problems. At the beginning of our research, the latest commitment was [ref](https://github.com/cosmos/ibc/commit/35354566c37ad70c3606c15bc3c937f0e115ad66), and subsequent commitments were not considered.
-### ICS03
-#### Chain
-##### Description
-This module represents the block chain, including the data structures and functions about connection handshake. See ICS03/Chain.tla
-##### Data Structure
+# IBC-TLA+
+We formalize main components of the IBC protocol with TLA+, a temporal logic specification language, and verify important requirements with model checking tool TLC. This document introduces the overall framework of the public code of our research, and explains the reports and feedbacks of the identified problems through our analysis. 
+
+Our research includes the connection, channel, and packet transmission of the core TAO layer of the IBC protocol, as well as fungible and non-fungible token transfer of the application layer. The modeling of each part consists of two modules: chain and environment. And we use the vscode extension of TLA+ ([ref](https://github.com/tlaplus/vscode-tlaplus)). 
+
+At the beginning of our research, the latest commitment of the IBC protocol was [this](https://github.com/cosmos/ibc/commit/35354566c37ad70c3606c15bc3c937f0e115ad66), and subsequent commitments were not considered.
+## [ICS-03 Connection](https://github.com/cosmos/ibc/blob/35354566c37ad70c3606c15bc3c937f0e115ad66/spec/core/ics-003-connection-semantics/README.md)
+### Chain
+#### Description
+This module represents the block chain, including the data structures and functions about connection handshake. See ICS03/Chain.tla.
+#### Data Structure
 ```json
   "ChainStore":{
     "client":{
@@ -22,12 +26,12 @@ This module represents the block chain, including the data structures and functi
     "compatibleVersions":"Set(int)"
   }
 ```
-##### Handle Functions
+#### Handle Functions
 + HandleConnOpenInit
 + HandleConnOpenTry
 + HandleConnOpenAck
 + HandleConnOpenConfirm
-##### Auxiliary Functions
+#### Auxiliary Functions
 + Query Functions
   + getChainStore
   + queryClient
@@ -37,10 +41,10 @@ This module represents the block chain, including the data structures and functi
   + generateID
   + pickVersion
   + verifyConnectionState
-#### Environment
-##### Description
-This module simulates the possible behavior of on-chian users and off-chain relayers by arbitrarily calling the Chain module. See ICS03/Environment.tla
-##### Key Function
+### Environment
+#### Description
+This module simulates the possible behavior of on-chian users and off-chain relayers by arbitrarily calling the Chain module. See ICS03/Environment.tla.
+#### Key Function
 ```TLA+
 HandleConnection(chainID) ==
     \E clientID, counterpartyClientID \in ClientIDs, connectionID, counterpartyConnectionID \in ConnectionIDs, version \in (SUBSET Versions \ {{}}): 
@@ -56,11 +60,11 @@ HandleConnection(chainID) ==
             /\ ChainB!HandleChannel(clientID, counterpartyClientID, connectionID, counterpartyConnectionID, version, proof)
             /\ UNCHANGED chainAvars
 ```
-### ICS04-Channel
-#### Chain
-##### Description
-This module represents the block chain, including the data structures and functions about channel handshake. See ICS04/channel/Chain.tla
-##### Data Structure
+## [ICS-04 Channel](https://github.com/cosmos/ibc/blob/35354566c37ad70c3606c15bc3c937f0e115ad66/spec/core/ics-004-channel-and-packet-semantics/README.md)
+### Chain
+#### Description
+This module represents the block chain, including the data structures and functions about channel handshake. See ICS04/channel/Chain.tla.
+#### Data Structure
 ```json
   "ChainStore":{
     "client":{
@@ -87,14 +91,14 @@ This module represents the block chain, including the data structures and functi
     "nextChannelID":"int"
   }
 ```
-##### Handle Functions
+#### Handle Functions
 + HandlechanOpenInit
 + HandlechanOpenTry
 + HandlechanOpenAck
 + HandlechanOpenConfirm
 + HandlechanCloseInit
 + HandlechanCloseConfirm
-##### Auxiliary Functions
+#### Auxiliary Functions
 + Query Functions
   + getChainStore
   + getChannelEnd
@@ -102,10 +106,10 @@ This module represents the block chain, including the data structures and functi
 + Others
   + generateID
   + verifyChannelState
-#### Environment
-##### Description
-This module simulates the possible behavior of on-chian users and off-chain relayers by arbitrarily calling the Chain module. See ICS04/channel/Environment.tla
-##### Key Function
+### Environment
+#### Description
+This module simulates the possible behavior of on-chian users and off-chain relayers by arbitrarily calling the Chain module. See ICS04/channel/Environment.tla.
+#### Key Function
 ```TLA+
 HandleChannel(chainID) ==
     \E order \in Orders, connectionID \in ConnectionIDs, 
@@ -122,11 +126,11 @@ HandleChannel(chainID) ==
             /\ ChainB!HandleChannel(order, connectionID, portID, channelID, counterpartyPortID, counterpartyChannelID, version, counterpartyVersion, proof)
             /\ UNCHANGED chainAvars
 ```
-### ICS04-Packet
-#### Chain
-##### Description
-This module represents the block chain, including the data structures and functions about channel handshake and packet delivery. See ICS04/packet/Chain.tla
-##### Data Structure
+## [ICS-04 Packet](https://github.com/cosmos/ibc/blob/35354566c37ad70c3606c15bc3c937f0e115ad66/spec/core/ics-004-channel-and-packet-semantics/README.md)
+### Chain
+#### Description
+This module represents the block chain, including the data structures and functions about channel handshake and packet delivery. See ICS04/packet/Chain.tla.
+#### Data Structure
 ```json
   "ChainStore":{
     "client":{
@@ -159,7 +163,7 @@ This module represents the block chain, including the data structures and functi
     "nextChannelID":"int"
   }
 ```
-##### Handle Functions
+#### Handle Functions
 + HandlechanOpenInit
 + HandlechanOpenTry
 + HandlechanOpenAck
@@ -171,7 +175,7 @@ This module represents the block chain, including the data structures and functi
 + HandleAcknowledgePacket
 + HandleTimeoutPacket
 + HandleTimeoutOnClose
-##### Auxiliary Functions
+#### Auxiliary Functions
 + Query Functions
   + getChainStore
   + getChannelEnd
@@ -192,10 +196,10 @@ This module represents the block chain, including the data structures and functi
   + verifyPacketReceipt
   + isSendTimeout
   + isRecvTimeout
-#### Environment
-##### Description
-This module simulates the possible behavior of on-chian users and off-chain relayers by arbitrarily calling the Chain module. See ICS04/packet/Environment.tla
-##### Key Function
+### Environment
+#### Description
+This module simulates the possible behavior of on-chian users and off-chain relayers by arbitrarily calling the Chain module. See ICS04/packet/Environment.tla.
+#### Key Function
 ```TLA+
 HandleChannel(chainID) ==
     \E order \in Orders, connectionID \in ConnectionIDs, 
@@ -228,11 +232,11 @@ HandlePacket(chainID) ==
         /\ ChainB!HandlePacket(sourcePort, sourceChannel, destPort, destChannel, sequence, nextSeqRecv, proofChannel, proofSource, proofDest)
         /\ UNCHANGED chainAvars
 ```
-### ICS20
-#### Chain
-##### Description
+## [ICS-20 Fungible Token Transfer](https://github.com/cosmos/ibc/blob/35354566c37ad70c3606c15bc3c937f0e115ad66/spec/app/ics-020-fungible-token-transfer/README.md)
+### Chain
+#### Description
 See ICS20/Chain.tla.
-##### Data Structure
+#### Data Structure
 ```typescript
 "ChainStore":{
     "connectionEnds":[{
@@ -262,10 +266,10 @@ See ICS20/Chain.tla.
   }
 "FungibleTokenAccounts":[(string, Seq(Set(string))) -> int]
 ```
-#### Environment
-##### Description
+### Environment
+#### Description
 See ICS20/Enviroment
-##### Key Function
+#### Key Function
 ```TLA+
 Next == 
     \/ \E chainID \in ChainIDs, 
@@ -291,11 +295,11 @@ Next ==
             /\ UNCHANGED chainVarsA
     \/ UNCHANGED vars
 ```
-### ICS721
-#### Chain
-##### Description
+## [ICS-721 Non-Fungible Token Transfer](https://github.com/cosmos/ibc/blob/35354566c37ad70c3606c15bc3c937f0e115ad66/spec/app/ics-721-nft-transfer)
+### Chain
+#### Description
 See ICS721/Chain.tla.
-##### Data Structure
+#### Data Structure
 ```typescript
 "ChainStore":{
     "connectionEnds":[{
@@ -325,10 +329,10 @@ See ICS721/Chain.tla.
   }
 "NonFungibleTokenAccounts":[(Seq(Set(string)), int) -> string]
 ```
-#### Environment
-##### Description
+### Environment
+#### Description
 See ICS721/Enviroment
-##### Key Function
+#### Key Function
 ```TLA+
 Next == 
     \/ \E chainID \in ChainIDs, 
@@ -354,11 +358,11 @@ Next ==
             /\ UNCHANGED chainVarsA
     \/ UNCHANGED vars
 ```
-### Results
-This section mainly discusses the reasons, triggering paths, repair suggestions of identified problems and community responses to our reports.
-#### Connection/Channel Handshake 
-##### Problem 1
-**Reasons and Triggering Paths**
+## Reports and Feedbacks
+This section mainly discusses the reasons, triggering paths, repair suggestions of identified problems and community feedbacks to our reports.
+### Uncompleted Handshake 
+#### Problem 1
+##### Reasons and Triggering Paths
 
 ```typescript
 function connOpenInit(...) {
@@ -384,13 +388,13 @@ As above, both ```connOpenInit``` and ```connOpenTry``` need to create a new con
 
 For example, both Chain A and Chain B can only allocate one identifier. If both Chain A and Chain B want to establish a connection with the other party by executing the ```connOpenInit```, neither party can execute ```connOpenTry``` to respond to the connection initiated by the other party, resulting in no connection being established. 
 
-**Recommendation and Reports**
+##### Recommendation and Reports
 
 The direct method is to allow the use of allocated connection ends to complete connection handshake. For example, if both Chain A and Chain B want to initiate a connection with each other, they should directly use two ```INIT``` state connection ends that have already been created to complete the handshake, instead of creating two more ```TRYOPEN``` state connection ends to complete two handshakes. We do not report this problem because similar solutions have been deprecated due to their complex and error prone processing logic, which can refer to [this](https://github.com/cosmos/ibc/pull/629). Considering the high transaction costs and data representation range on the blockchain, identifiers or other resources may be considered sufficient.
 
-##### Problem 2
+#### Problem 2
 
-**Reasons and Triggering Paths**
+##### Reasons and Triggering Paths
 
 A ```INIT``` state connection end of the counterparty chain can be used to create multiple ```TRYOPEN ```state connection ends, because ```connOpenTry``` only verifies the counterparty connection end's state and does not check if it already has a corresponding connection end. However, only one of these ```TRYOPEN``` state connection ends will match the ```INIT``` state connection end in the ```connOpenAck``` because the ```connOpenAck`` will change connection end's state. The remaining connection ends will freeze in their previous states. These frozen ends will interfere with the normal use of users, such as mistakenly executing transactions through these unopened connections/channels, resulting in transaction errors.
 ```typescript
@@ -405,13 +409,13 @@ function connOpenAck(...) {
 }
 ```
 
-**Recommendation and Reports**
+##### Recommendation and Reports
 
 There are two ways to solve this problem. One is to determine whether there is a corresponding connection end when executing the ```connOpenTry```, and the other is to allow the closure of connection ends that cannot complete the handshake. However, the former requires traversing existing connection ends, while the latter requires the introduction of new judgment and permission mechanisms. [Similar situations have occurred in the actual use of IBC](https://github.com/cosmos/ibc/issues/635#issuecomment-1013262400), and [some have proposed mechanisms similar to the latter, but they have not been adopted](https://github.com/cosmos/ibc/issues/648).
-#### Incorrect design of ordered_allow_timeout channels
-##### Problem 3
+### Incorrect design of ordered_allow_timeout channels
+#### Problem 3
 
-**Reasons and Triggering Paths**
+##### Reasons and Triggering Paths
 
 Ordered_allow_timeout channel is a special channel that allows for timeout situations in ordered transmission. However, there are some errors in determining the timeout condition for this channel type.
 
@@ -498,11 +502,12 @@ The right one should be
 ```typescript
 abortTransactionUnless(nextSequenceRecv  <= packet.sequence) || (verifyPacketReceipt(...packet.sequence, TIMEOUT_RECEIPT) == True)
 ```
-**Recommendation and Reports**
+##### Recommendation and Reports
 
 We've reported this problem ([ref](https://github.com/cosmos/ibc/issues/965)) and it's being fixed ([ref](https://github.com/cosmos/ibc/pull/977)).
-##### Problem 4
-**Reasons and Triggering Paths**
+
+#### Problem 4
+##### Reasons and Triggering Paths
 
 For ```ORDERED_ALLOW_TIMEOUT``` channel, ```timeoutPacket``` will increase ```nextSequenceAck```. 
 ```typescript
@@ -528,7 +533,7 @@ function acknowledgePacket(...): {
   }
 ```
 
-**Recommendation and Reports**
+##### Recommendation and Reports
 
 There are different solutions to solve this problem, but if data packets are required to be received and answered in the order they were sent, conditions should be added to ensure that all datagram operations are strictly executed in order.
 ```typescript
@@ -543,10 +548,11 @@ function timeoutPacket(...): {
   }
 ```
 We reported this problem, but the developer think it can be handled by the application ([ref](https://github.com/cosmos/ibc/issues/968#issuecomment-1569206700)). Of course, applications can address this issue in a targeted manner, but application developers may not be aware of the need to specifically address this issue. And this problem is actually due to the protocol not fully implementing its semantics: for ordered channels, packets should be processed strictly in order, and the loose conditions of ```timeoutPacket``` break this strict order.
-#### Inappropriate handling of abnormal channel states
-##### Problem 5
 
-**Reasons and Triggering Paths**
+### Inappropriate handling of abnormal channel states
+#### Problem 5
+
+##### Reasons and Triggering Paths
 
 Assume that module a on chain A sends a packet to module b on chain B (by calling ```sendPacket``` and assume that the channel is already open in both chains), and module b receives the packet successfully (by calling ```recvPacket```), then module b closes the channel (by calling ```chanCloseInit```). Now module a has two datagrams on the way and two function ```acknowledgePacket``` and ```chanCloseConfirm``` to call. If ```chanCloseConfirm``` is called first due to the concurrency between relayers or incorrect behavior of relay (the relay is not trusted), ```acknowledgePacket``` can not be called bacause the channel is closed.
 ```typescript
@@ -560,13 +566,13 @@ function acknowledgePacket(...): {
 ```
 And the packet can't be ack or timeout (since it has been received successfully).
 
-**Recommendation and Reports**
+##### Recommendation and Reports
 
 At the protocol level, it is possible to solve this problem by allowing packets to be acknowledged after the channel is closed, but developers believe that such issues should be addressed at the application level ([ref](https://github.com/cosmos/ibc/issues/968#issuecomment-1569206700)).
 
-##### Problem 6
+#### Problem 6
 
-**Reasons and Triggering Paths**
+##### Reasons and Triggering Paths
 
 As ICS04, A module can call ```sendPacket``` before a channel open, which is called optimistic sending. 
 ```typescript
@@ -604,16 +610,16 @@ function timeoutOnClose(
 It does not match what the ```timeoutOnClose``` is designed for and 
 >Any in-flight packets can be timed-out as soon as a channel is closed
 
-**Recommendation and Reports**
+##### Recommendation and Reports
 
 There are different ways to solve this problem. We have reported this issue to the developers, who believe that although there is an issue at the protocol level, optimistic sending has been disabled in practical implementation ([ref](https://github.com/cosmos/ibc/issues/968#issuecomment-1552158823)). In fact, optimistic sending is disabled because similar issues have occurred in practical use ([ref](https://github.com/cosmos/ibc/issues/635#issuecomment-1020318753)). The root cause of these problems is that optimistic sending allows packets to be sent on channels that are not yet open, which may result in the channel being in a state of no counterparty, neither open nor closed, closed, or open. But the two functions ```timeoutOnClose``` and ```timeoutPacket``` fail to cover all situations.
 
-#### Abnormal Refund of Transferred Token
+### Abnormal Refund of Transferred Token
 See [report](https://github.com/cosmos/ibc/issues/1035).
 
-#### Code Redundancy
+### Code Redundancy
 
-**Reasons and Triggering Paths**
+#### Reasons and Triggering Paths
 
 With protocol updates, some code may no longer be in effect. It may be difficult for manual analysis to discover and verify these redundant codes. But through formal analysis, we can prove that these codes are no longer effective.
 
@@ -632,14 +638,14 @@ function pendingDatagrams(...):{
 }
 ```
 
-**Recommendation and Reports**
+#### Recommendation and Reports
 
 We have reported this kind of problems and it has been fixed (ref [1](https://github.com/cosmos/ibc/issues/960), [2](https://github.com/hyperledger-labs/yui-ibc-solidity/issues/168)).
 
-#### Inconsistent in Documents
+### Inconsistent in Documents
 
 
-**Reasons and Triggering Paths**
+#### Reasons and Triggering Paths
 
 Due to the continuous maintenance of protocol documents by multiple individuals, it is inevitable that some inconsistencies or errors may occur. Due to the need for careful review of documents during the formal analysis, it is easier to discover these documents.
 
@@ -667,6 +673,6 @@ function handleConnOpenInit(datagram: ConnOpenInit) {
 }
   ```
 
-**Recommendation and Reports**
+#### Recommendation and Reports
 
 We have reported this kind of problems and it has been fixed (ref [1](https://github.com/cosmos/ibc/issues/961), [2](https://github.com/cosmos/ibc/issues/934)).
